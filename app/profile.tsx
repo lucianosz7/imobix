@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   Image,
+  Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
@@ -22,6 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Colors } from '../constants/colors';
 import { removeToken, api } from '../services/api';
+import PaymentModal from '../components/PaymentModal';
 
 const PROFILE_KEY = '@imobix_profile';
 
@@ -42,6 +44,8 @@ export default function ProfileScreen() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState('');
 
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(24);
@@ -144,6 +148,24 @@ export default function ProfileScreen() {
         'Para adicionar foto no app mobile, instale o expo-image-picker e recompile o app.',
         [{ text: 'OK' }]
       );
+    }
+  };
+
+  const handleUpgrade = async () => {
+    try {
+      setSaving(true);
+      const data = await api.upgradePlan('pro');
+      // Usar URL da API ou a enviada no prompt se necessário
+      const url = data.checkout_url || 'https://app.abacatepay.com/pay/bill_AXHzZt3AftmAyBRQHaBxJqdc';
+      
+      if (url) {
+        setPaymentUrl(url);
+        setShowPaymentModal(true);
+      }
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'Erro no upgrade', text2: e?.message });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -282,9 +304,17 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.upgradeBtn}>
-            <Text style={styles.upgradeBtnText}>Upgrade</Text>
-          </TouchableOpacity>
+          {profile.plan !== 'pro' && (
+            <TouchableOpacity 
+              style={[styles.upgradeBtn, saving && { opacity: 0.7 }]} 
+              onPress={handleUpgrade}
+              disabled={saving}
+            >
+              <Text style={styles.upgradeBtnText}>
+                {saving ? 'Aguarde...' : 'Upgrade'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Logout */}
@@ -293,6 +323,20 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Sair da conta</Text>
         </TouchableOpacity>
       </Animated.View>
+
+      <PaymentModal
+        visible={showPaymentModal}
+        url={paymentUrl}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={() => {
+          Toast.show({
+            type: 'success',
+            text1: 'Pagamento concluído!',
+            text2: 'Seu plano será atualizado em instantes.'
+          });
+          loadProfile(); // Recarrega perfil para ver o novo plano
+        }}
+      />
     </ScrollView>
   );
 }

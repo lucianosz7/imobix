@@ -125,4 +125,6 @@ export const api = {
 
   createExpense: (expenseData: any) => fetchWithAuth('/expenses', { method: 'POST', body: JSON.stringify(expenseData) }),
   createIncome: (incomeData: any) => fetchWithAuth('/incomes', { method: 'POST', body: JSON.stringify(incomeData) }),
+
+  upgradePlan: (plan: string) => fetchWithAuth('/billing/upgrade', { method: 'POST', body: JSON.stringify({ plan }) }),
 };
