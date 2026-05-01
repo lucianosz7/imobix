@@ -127,4 +127,13 @@ export const api = {
   createIncome: (incomeData: any) => fetchWithAuth('/incomes', { method: 'POST', body: JSON.stringify(incomeData) }),
 
   upgradePlan: (plan: string) => fetchWithAuth('/billing/upgrade', { method: 'POST', body: JSON.stringify({ plan }) }),
+
+  /**
+   * Polls payment status for a given bill ID.
+   * GET /payment/status/:billId → { status: "pending" | "paid" | "failed" | "expired" }
+   */
+  getPaymentStatus: async (billId: string): Promise<'pending' | 'paid' | 'failed' | 'expired'> => {
+    const data = await fetchWithAuth(`/payment/status/${billId}`, { method: 'GET', suppressToast: true });
+    return data?.status ?? 'pending';
+  },
 };

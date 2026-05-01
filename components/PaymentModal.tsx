@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -7,15 +7,21 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Text,
-  Platform,
 } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
+import { usePaymentStatus } from '../hooks/usePaymentStatus';
 
 interface PaymentModalProps {
   visible: boolean;
+  /** AbacatePay checkout URL */
   url: string;
+  /**
+   * AbacatePay bill ID (e.g. "bill_xxx") used to poll /payment/status/:billId.
+   * If null, polling is disabled and only URL-change detection is used.
+   */
+  billId: string | null;
   onClose: () => void;
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -24,19 +30,37 @@ interface PaymentModalProps {
 export default function PaymentModal({
   visible,
   url,
+  billId,
   onClose,
   onSuccess,
   onCancel,
 }: PaymentModalProps) {
   const [loading, setLoading] = useState(true);
+  const [paid, setPaid] = useState(false);
 
-  const handleNavigationStateChange = (navState: WebViewNavigation) => {
-    // Detectar sucesso ou cancelamento via URL (exemplo)
-    if (navState.url.includes('/success')) {
-      if (onSuccess) onSuccess();
+  // ─── Polling ───────────────────────────────────────────────────────────────
+  const handlePaid = useCallback(() => {
+    setPaid(true);
+    // Small delay so the success overlay is visible before the modal closes
+    setTimeout(() => {
+      setPaid(false);
+      onSuccess?.();
       onClose();
+    }, 1200);
+  }, [onSuccess, onClose]);
+
+  // Polling is active only while the modal is open and we have a billId
+  usePaymentStatus({
+    billId: visible ? billId : null,
+    onPaid: handlePaid,
+  });
+
+  // ─── WebView URL fallback ──────────────────────────────────────────────────
+  const handleNavigationStateChange = (navState: WebViewNavigation) => {
+    if (navState.url.includes('/success')) {
+      handlePaid();
     } else if (navState.url.includes('/cancel') || navState.url.includes('/error')) {
-      if (onCancel) onCancel();
+      onCancel?.();
       onClose();
     }
   };
@@ -58,7 +82,7 @@ export default function PaymentModal({
               <Text style={styles.secureText}>SSL</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose} disabled={paid}>
             <Ionicons name="close" size={24} color={Colors.text} />
           </TouchableOpacity>
         </View>
@@ -80,6 +104,19 @@ export default function PaymentModal({
             style={{ flex: 1, backgroundColor: Colors.primary }}
           />
         </View>
+
+        {/* ── Success overlay ── shown briefly when payment is confirmed */}
+        {paid && (
+          <View style={styles.successOverlay}>
+            <View style={styles.successCard}>
+              <View style={styles.successIcon}>
+                <Ionicons name="checkmark" size={42} color="#fff" />
+              </View>
+              <Text style={styles.successTitle}>Pagamento confirmado!</Text>
+              <Text style={styles.successSub}>Seu plano será atualizado em instantes.</Text>
+            </View>
+          </View>
+        )}
       </SafeAreaView>
     </Modal>
   );
@@ -153,5 +190,42 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: 14,
     fontWeight: '500',
+  },
+  // ── Success overlay ──
+  successOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    paddingVertical: 40,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    gap: 14,
+    width: '78%',
+  },
+  successIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  successTitle: {
+    color: Colors.text,
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  successSub: {
+    color: Colors.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

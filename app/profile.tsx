@@ -46,6 +46,7 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState('');
+  const [paymentBillId, setPaymentBillId] = useState<string | null>(null);
 
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(24);
@@ -155,11 +156,13 @@ export default function ProfileScreen() {
     try {
       setSaving(true);
       const data = await api.upgradePlan('pro');
-      // Usar URL da API ou a enviada no prompt se necessário
+      // data = { checkout_url, bill_id }
       const url = data.checkout_url || 'https://app.abacatepay.com/pay/bill_AXHzZt3AftmAyBRQHaBxJqdc';
-      
+      const billId: string | null = data.bill_id ?? null;
+
       if (url) {
         setPaymentUrl(url);
+        setPaymentBillId(billId);
         setShowPaymentModal(true);
       }
     } catch (e: any) {
@@ -327,14 +330,15 @@ export default function ProfileScreen() {
       <PaymentModal
         visible={showPaymentModal}
         url={paymentUrl}
+        billId={paymentBillId}
         onClose={() => setShowPaymentModal(false)}
         onSuccess={() => {
           Toast.show({
             type: 'success',
-            text1: 'Pagamento concluído!',
-            text2: 'Seu plano será atualizado em instantes.'
+            text1: 'Pagamento concluído! 🎉',
+            text2: 'Seu plano foi atualizado para PRO.',
           });
-          loadProfile(); // Recarrega perfil para ver o novo plano
+          loadProfile();
         }}
       />
     </ScrollView>
